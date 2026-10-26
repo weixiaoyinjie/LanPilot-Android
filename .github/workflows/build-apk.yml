@@ -1,4 +1,3 @@
-
 name: Build Android APK
 
 on:
@@ -24,28 +23,34 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Verify Android SDK
+      # GitHub-hosted Ubuntu 24.04 has the Android SDK preinstalled.
+      # Avoid setup-android v3's extra license/repository refresh, which can fail.
+      - name: Verify preinstalled Android SDK 37
         shell: bash
         run: |
           set -euo pipefail
-          echo "Android SDK: $ANDROID_HOME"
+          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
+          test -d "$ANDROID_HOME" || { echo 'Missing Android SDK'; exit 1; }
           ls -1 "$ANDROID_HOME/platforms"
-
-          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
-          test -d "$ANDROID_HOME/build-tools/36.0.0"
-
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar" || {
+            echo 'Preinstalled android-37.0 platform not found'
+            exit 1
+          }
+          test -d "$ANDROID_HOME/build-tools/36.0.0" || {
+            echo 'Build tools 36.0.0 missing'
+            exit 1
+          }
+          # Android Gradle plugin may look for android-37 rather than android-37.0.
           if [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
-            sudo ln -s \
-              "$ANDROID_HOME/platforms/android-37.0" \
-              "$ANDROID_HOME/platforms/android-37"
+            sudo ln -s "$ANDROID_HOME/platforms/android-37.0" "$ANDROID_HOME/platforms/android-37"
           fi
 
-      - name: Set up Gradle
+      - name: Set up Gradle 9.5.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.1'
 
-      - name: Build APK
+      - name: Build debug APK
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Upload APK
